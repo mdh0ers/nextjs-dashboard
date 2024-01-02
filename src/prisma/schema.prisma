@@ -33,7 +33,7 @@ model Customer {
   name  String  @db.VarChar(255)
   email String  @db.VarChar(255)
   image_url String @db.VarChar(255)
-  users Invoice[] @relation
+  invoices Invoice[] @relation
 }
 
 model Revenue {
