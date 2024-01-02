@@ -25,6 +25,19 @@ export async function fetchRevenue(prisma: PrismaClient) {
 export async function fetchLatestInvoices(prisma: PrismaClient) {
     try {
         const data = await prisma.invoice.findMany({
+            select: {
+                id: true,
+                amount: true,
+                date: true,
+                status: true,
+                customer: {
+                    select: {
+                        name: true,
+                        email: true,
+                        image_url: true,
+                    }
+                }
+            },
             orderBy: {
                 date: "desc"
             },
@@ -43,7 +56,7 @@ export async function fetchLatestInvoices(prisma: PrismaClient) {
 }
 
 async function sumInvoiceAmount(prisma: PrismaClient, status: "paid" | "pending") {
-    return await prisma.invoice.aggregate({
+    let sum = await prisma.invoice.aggregate({
         _sum: {
             amount: true
         },
@@ -51,21 +64,33 @@ async function sumInvoiceAmount(prisma: PrismaClient, status: "paid" | "pending"
             status: status
         }
     });
+    if (sum._sum.amount === null) {
+        return "";
+    }
+    return formatCurrency(BigInt(sum._sum.amount));
 }
 
 export async function fetchCardData(prisma: PrismaClient) {
     try {
-        const numberOfInvoices = await prisma.invoice.count();
-        const numberOfCustomers = await prisma.customer.count();
-        const totalPaidInvoices = (await sumInvoiceAmount(prisma, "paid"))._sum.amount;
-        const totalPendingInvoices = (await sumInvoiceAmount(prisma, "pending"))._sum.amount;
 
+        const numberOfInvoicesPromise = prisma.invoice.count();
+        const numberOfCustomersPromise = prisma.customer.count();
+        const totalPaidInvoicesPromise = (sumInvoiceAmount(prisma, "paid"));
+        const totalPendingInvoicesPromise = (sumInvoiceAmount(prisma, "pending"));
+
+        const data = await Promise.all([
+            numberOfCustomersPromise,
+            numberOfInvoicesPromise,
+            totalPaidInvoicesPromise,
+            totalPendingInvoicesPromise,
+        ]);
+        
         return {
-            numberOfCustomers,
-            numberOfInvoices,
-            totalPaidInvoices,
-            totalPendingInvoices
-        }
+            numberOfCustomers: data[0],
+            numberOfInvoices: data[1],
+            totalPaidInvoices: data[2],
+            totalPendingInvoices: data[3]
+        };
     }
     catch (error) {
         console.error("Database Error:", error);
@@ -249,8 +274,6 @@ export async function fetchFilteredCustomers(prisma: PrismaClient, query: Custom
             total_pending: formatCurrency(customer.total_pending),
             total_paid: formatCurrency(customer.total_paid),
         }));
-
-        console.log(customers);
 
         return customers;
     }
