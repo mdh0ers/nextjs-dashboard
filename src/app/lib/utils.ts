@@ -1,9 +1,9 @@
 import { Revenue } from './definitions';
 
-export const formatCurrency = (amount: bigint) => {
-  return (amount / BigInt(100)).toLocaleString('en-US', {
+export const formatCurrency = (amount: number) => {
+  return (amount / 100).toLocaleString('fr-FR', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'EUR',
   });
 };
 
