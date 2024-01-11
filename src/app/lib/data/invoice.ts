@@ -3,6 +3,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import { formatCurrency } from "../utils";
 
 const prisma = new PrismaClient();
+const ITEMS_PER_PAGE = 6;
 
 type InvoiceFilter = {
     date?: string,
@@ -52,7 +53,7 @@ export async function fetchLatestInvoices(count: number = 5) {
     }
 }
 
-export async function fetchFilteredInvoices(filter: InvoiceFilter, take?: number, skip?: number) {
+export async function fetchFilteredInvoices(search: string, currentPage: number) {
     noStore();
     try {
         const invoices = await prisma.invoice.findMany({
@@ -70,34 +71,25 @@ export async function fetchFilteredInvoices(filter: InvoiceFilter, take?: number
                 }
             },
             where: {
-                AND: [
-                    {
-                        date: filter.date,
-                    },
-                    {
-                        amount: filter.amount,
-                    },
-                    {
-                        status: filter.status,
-                    },
+                OR: [
                     {
                         customer: {
                             name: {
-                                contains: filter.customer?.name,
+                                contains: search,
                             },
                         },
                     },
                     {
                         customer: {
                             email: {
-                                contains: filter.customer?.email,
+                                contains: search,
                             },
                         },
                     },
                 ],
             },
-            take: take,
-            skip: skip,
+            take: ITEMS_PER_PAGE,
+            skip: ((currentPage - 1) * ITEMS_PER_PAGE),
         });
         return invoices;
     }
@@ -127,6 +119,36 @@ export async function fetchInvoiceById(id: string) {
             ... data,
             amount: data.amount / 100,
         };
+    }
+    catch (error) {
+        console.error("Database Error:", error);
+        throw new Error('Failed to fetch invoices');
+    }
+}
+
+export async function fetchInvoicesPages(query: string) {
+    try {
+        const count = await prisma.invoice.count({
+            where: {
+                OR: [
+                    {
+                        customer: {
+                            name: {
+                                contains: query
+                            }
+                        }
+                    },
+                    {
+                        customer: {
+                            email: {
+                                contains: query
+                            }
+                        }
+                    }
+                ]
+            }
+        });
+        return Math.ceil(count / ITEMS_PER_PAGE);
     }
     catch (error) {
         console.error("Database Error:", error);
